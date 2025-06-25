@@ -1,5 +1,7 @@
 const express = require("express");
 require("dotenv").config();
+const helmet = require('helmet');
+const rateLimiting = require("express-rate-limit");
 const connectToDb = require("./config/db");
 const { errorHandler, notFound } = require("./middlewares/error");
 const cookieParser = require('cookie-parser')
@@ -33,7 +35,16 @@ const app = express()
 //   res.setHeader('Access-Control-Allow-Headers', 'Authorization')
 //   next()
 // })
+ 
+app.use(helmet());
 
+// Global rate limiter: limits each IP to 100 requests per 15 minutes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests. Please try again later.',
+});
+app.use(limiter);
 app.use(cors({
   origin: 'http://localhost:3000 http://localhost:4000' 
 }))
