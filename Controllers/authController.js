@@ -1,5 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcryptjs");
+const LoggerService = require("../services/logger.service");
 const jwt = require("jsonwebtoken");
 const {
   User,
@@ -9,6 +10,7 @@ const {
 const VerificationToken = require("../models/VerificationToken");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const logger = new LoggerService("auth");
 
 /**-----------------------------------------------
  * @desc    Register New User
@@ -19,12 +21,17 @@ const sendEmail = require("../utils/sendEmail");
 module.exports.registerUserCtrl = asyncHandler(async (req, res) => {
   const { error } = validateRegisterUser(req.body);
   if (error) {
-    console.log(error.details[0].message)
+    logger.info("Validierungsfehler bei der Registrierung", {
+      details: error.details[0].message,
+    });
     return res.status(400).json({ message: error.details[0].message });
   }
 
   let user = await User.findOne({ email: req.body.email });
   if (user) {
+    logger.info("Registrierungsversuch mit bereits existierender E-Mail", {
+      email: req.body.email,
+    });
     return res.status(400).json({ message: "Benutzer existiert bereits" });
   }
 
@@ -39,7 +46,10 @@ module.exports.registerUserCtrl = asyncHandler(async (req, res) => {
     phone: req.body.phone,
   });
   await user.save();
-
+  logger.info("Neuer Benutzer erfolgreich registriert", {
+    userId: user._id,
+    email: user.email,
+  });
   // Creating new VerificationToken & save it toDB
   const verifictionToken = new VerificationToken({
     userId: user._id,
@@ -64,6 +74,8 @@ module.exports.registerUserCtrl = asyncHandler(async (req, res) => {
     htmlTemplate
   );
 
+  logger.info("Verifizierungs-E-Mail gesendet", { email: user.email });
+
   // Response to the client
   res.status(201).json({
     message:
@@ -79,9 +91,9 @@ module.exports.registerUserCtrl = asyncHandler(async (req, res) => {
  ------------------------------------------------*/
 module.exports.loginUserCtrl = asyncHandler(async (req, res) => {
   const { error } = validateLoginUser(req.body);
-  console.log(typeof(req.body.email))
+  console.log(typeof req.body.email);
   if (error) {
-    console.log(error.details[0].message)
+    console.log(error.details[0].message);
     return res.status(400).json({ message: error.details[0].message });
   }
 
@@ -140,7 +152,7 @@ module.exports.loginUserCtrl = asyncHandler(async (req, res) => {
   // Create secure cookie with refresh token
   res.cookie("jwt", refreshToken, {
     httpOnly: true, //accessible only by web server
-     secure: true, //https
+    secure: true, //https
     sameSite: "None", //cross-site cookie
     maxAge: 7 * 24 * 60 * 60 * 1000, //cookie expiry: set to match rT
   });
@@ -150,9 +162,9 @@ module.exports.loginUserCtrl = asyncHandler(async (req, res) => {
     isAdmin: user.isAdmin,
     profilePhoto: user.profilePhoto,
     token,
-    refreshToken
+    refreshToken,
   });
-  console.log(res)
+  console.log(res);
 });
 
 /**-----------------------------------------------
@@ -197,9 +209,9 @@ module.exports.refresh = asyncHandler((req, res) => {
   if (!authRefresh) {
     return res.status(401).json({ message: "Unberechtigt" });
   }
-    const refreshToken = authRefresh.split(" ")[1];
- // const cookies = req.cookies;
- // console.log(cookies, 1);
+  const refreshToken = authRefresh.split(" ")[1];
+  // const cookies = req.cookies;
+  // console.log(cookies, 1);
   // if (!cookies?.jwt)
   //const refreshToken = cookies.jwt;
 
